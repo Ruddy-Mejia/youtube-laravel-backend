@@ -1,59 +1,129 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Backend - YouTube Clone API
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+REST API built with Laravel 11 for a YouTube-like platform. Handles users, channels, videos, comments with nested replies, likes, subscriptions, and view history. Thumbnails are uploaded as images; video files are not supported.
 
-## About Laravel
+## Requirements
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- PHP 8.2+
+- Composer
+- MySQL 8+
+- Laravel 11
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Installation
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+git clone <repo-url> backend
+cd backend
+composer install
+cp .env.example .env
+php artisan key:generate
 
-## Learning Laravel
+Configure database credentials in .env, then:
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+php artisan migrate --seed
+php artisan storage:link
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Environment
 
-## Laravel Sponsors
+Key variables:
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+- DB_CONNECTION, DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, DB_PASSWORD
+- SANCTUM_STATEFUL_DOMAINS
+- FILESYSTEM_DISK=public
 
-### Premium Partners
+## Authentication
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+Token-based via Laravel Sanctum. Send the token in every authenticated request:
 
-## Contributing
+Authorization: Bearer <token>
+Accept: application/json
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Endpoints:
 
-## Code of Conduct
+- POST /api/register
+- POST /api/login
+- POST /api/logout
+- GET  /api/me
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Main Endpoints
 
-## Security Vulnerabilities
+Users
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- GET    /api/users
+- GET    /api/users/{user}
+- PUT    /api/users/{user}
+- DELETE /api/users/{user}
 
-## License
+Videos
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- GET    /api/videos
+- POST   /api/videos
+- GET    /api/videos/{video}
+- PUT    /api/videos/{video}
+- DELETE /api/videos/{video}
+
+Comments
+
+- GET    /api/videos/{video}/comments
+- POST   /api/comments
+- PUT    /api/comments/{comment}
+- DELETE /api/comments/{comment}
+
+Replies use the same POST /api/comments endpoint with comment_id instead of video_id.
+
+Interactions
+
+- POST /api/videos/{video}/like
+- POST /api/channels/{user}/subscribe
+- GET  /api/history
+
+## Architecture
+
+- Controllers: thin, delegate validation to FormRequests, formatting to Resources
+- Resources: control exposed fields via whenLoaded and whenCounted
+- Policies: ownership checks for update and delete on User, Video, Comment
+- Relations: pivot tables for likes, subscriptions, video_views
+- Soft deletes: applied to User, Video, Comment
+
+## Testing
+
+Pest is used for feature tests. Run:
+
+php artisan test
+
+Tests use SQLite in memory via phpunit.xml. Development database is untouched.
+
+Key helper in tests/Pest.php:
+
+actingAsUser()
+
+## Storage
+
+Thumbnails are stored on the public disk at storage/app/public/thumbnails. Accessible via /storage/thumbnails/{file}. The public disk must be linked:
+
+php artisan storage:link
+
+## Project Structure
+
+app/
+  Http/Controllers
+  Http/Requests
+  Http/Resources
+  Models
+  Policies
+database/
+  factories
+  migrations
+  seeders
+routes/
+  api.php
+tests/
+  Feature
+  Pest.php
+
+## Notes
+
+- All responses are JSON.
+- 401 for unauthenticated, 403 for forbidden, 404 for missing, 422 for validation errors.
+- Video views are counted only for authenticated users.
+- Comment replies are limited to one level.
+- Categories are read-only through the API.
