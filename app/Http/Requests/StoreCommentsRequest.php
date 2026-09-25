@@ -15,7 +15,8 @@ class StoreCommentsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'video_id' => ['required', 'integer', 'exists:videos,id'],
+            'video_id' => ['integer', 'exists:videos,id'],
+            'comment_id' => ['integer', 'exists:comments,id'],
             'body' => ['required', 'string', 'max:500'],
         ];
     }

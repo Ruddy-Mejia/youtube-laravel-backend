@@ -59,4 +59,12 @@ class User extends Authenticatable
             'subscriber_id'
         )->withTimestamps();
     }
+
+    public function watchedVideos()
+    {
+        return $this->belongsToMany(Video::class, 'video_views')
+            ->withPivot('viewed_at')
+            ->withTimestamps()
+            ->orderByPivot('viewed_at', 'desc');
+    }
 }

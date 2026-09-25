@@ -12,15 +12,17 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     Storage::fake('public');
 });
+
 test('lista videos paginados', function () {
     Video::factory()->count(3)->create();
-
+    actingAsUser();
     $this->getJson('/api/videos')
          ->assertOk()
          ->assertJsonCount(3, 'data');
 });
 
 test('lista videos incluye author', function () {
+    actingAsUser();
     $video = Video::factory()->create();
 
     $this->getJson('/api/videos')
@@ -28,6 +30,7 @@ test('lista videos incluye author', function () {
          ->assertJsonPath('data.0.author.id', $video->user_id);
 });
 test('muestra un video especifico', function () {
+    actingAsUser();
     $video = Video::factory()->create();
 
     $this->getJson("/api/videos/{$video->id}")
@@ -36,17 +39,20 @@ test('muestra un video especifico', function () {
 });
 
 test('retorna 404 si el video no existe', function () {
+    actingAsUser();
     $this->getJson('/api/videos/9999')
          ->assertNotFound();
 });
 
 test('incrementa views al ver un video', function () {
+    actingAsUser();
     $video = Video::factory()->create(['views' => 0]);
 
     $this->getJson("/api/videos/{$video->id}");
 
     expect($video->fresh()->views)->toBe(1);
 });
+
 test('usuario autenticado puede crear un video', function () {
     $user = actingAsUser();
     $category = Category::factory()->create();
@@ -56,6 +62,7 @@ test('usuario autenticado puede crear un video', function () {
         'description' => 'Description here',
         'thumbnail' => UploadedFile::fake()->image('thumb.jpg'),
         'categories' => [$category->id],
+        'user_id' => [$user->id]
     ];
 
     $this->postJson('/api/videos', $payload)
@@ -69,12 +76,17 @@ test('usuario autenticado puede crear un video', function () {
 });
 
 test('guarda el thumbnail en storage', function () {
-    actingAsUser();
+    $user = actingAsUser();
+    $category = Category::factory()->create();
 
-    $this->postJson('/api/videos', [
-        'title' => 'Video with thumb',
+    $payload = [
+        'title' => 'My first video',
+        'description' => 'Description here',
         'thumbnail' => UploadedFile::fake()->image('thumb.jpg'),
-    ])->assertCreated();
+        'categories' => [$category->id],
+        'user_id' => [$user->id]
+    ];
+    $this->postJson('/api/videos', $payload)->assertCreated();
 
     $video = Video::first();
 
@@ -82,16 +94,30 @@ test('guarda el thumbnail en storage', function () {
 });
 
 test('usuario no autenticado no puede crear video', function () {
-    $this->postJson('/api/videos', [
-        'title' => 'Test',
-    ])->assertUnauthorized();
+    $user = User::factory()->create();
+    $category = Category::factory()->create();
+
+    $payload = [
+        'title' => 'My first video',
+        'description' => 'Description here',
+        'thumbnail' => UploadedFile::fake()->image('thumb.jpg'),
+        'categories' => [$category->id],
+        'user_id' => [$user->id]
+    ];
+    $this->postJson('/api/videos', $payload)->assertUnauthorized();
 });
 test('title es requerido', function () {
-    actingAsUser();
+    $user = actingAsUser();
+    $category = Category::factory()->create();
 
-    $this->postJson('/api/videos', [
+    $payload = [
+        'description' => 'Description here',
         'thumbnail' => UploadedFile::fake()->image('thumb.jpg'),
-    ])->assertUnprocessable()
+        'categories' => [$category->id],
+        'user_id' => [$user->id]
+    ];
+
+    $this->postJson('/api/videos', $payload)->assertUnprocessable()
       ->assertJsonValidationErrors('title');
 });
 
@@ -114,6 +140,7 @@ test('thumbnail no puede pesar mas de 2MB', function () {
     ])->assertUnprocessable()
       ->assertJsonValidationErrors('thumbnail');
 });
+
 test('dueño puede actualizar su video', function () {
     $user = actingAsUser();
     $video = Video::factory()->for($user)->create();
@@ -142,6 +169,7 @@ test('usuario no autenticado no puede actualizar', function () {
         'title' => 'Test',
     ])->assertUnauthorized();
 });
+
 test('dueño puede eliminar su video', function () {
     $user = actingAsUser();
     $video = Video::factory()->for($user)->create();
@@ -149,7 +177,7 @@ test('dueño puede eliminar su video', function () {
     $this->deleteJson("/api/videos/{$video->id}")
          ->assertNoContent();
 
-    $this->assertDatabaseMissing('videos', ['id' => $video->id]);
+    $this->assertSoftDeleted('videos', ['id' => $video->id]);
 });
 
 test('usuario no puede eliminar video de otro', function () {

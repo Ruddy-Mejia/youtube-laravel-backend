@@ -14,57 +14,74 @@ use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
-    public function index(): AnonymousResourceCollection
+    public function index(): AnonymousResourceCollection|JsonResponse
     {
-        Gate::authorize('viewAny', User::class);
+        try {
+            Gate::authorize('viewAny', User::class);
 
-        $users = User::withCount(['videos', 'subscriptions'])
-            ->latest()
-            ->paginate(15);
+            $users = User::withCount(['videos', 'subscriptions'])
+                ->latest()
+                ->paginate(15);
 
-        return UserResource::collection($users);
+            return UserResource::collection($users);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
     }
 
 
     public function store(StoreUserRequest $request): JsonResponse
     {
-        $data = $request->validated();
-        $data['password'] = Hash::make($data['password']);
+        try {
+            $data = $request->validated();
+            $data['password'] = Hash::make($data['password']);
 
-        $user = User::create($data);
+            $user = User::create($data);
 
-        return (new UserResource($user))
-            ->response()
-            ->setStatusCode(201);
+            return (new UserResource($user))
+                ->response()
+                ->setStatusCode(201);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
     }
 
-    public function show(User $user): UserResource
+    public function show(User $user): UserResource | JsonResponse
     {
-        Gate::authorize('view', $user);
+        try {
+            Gate::authorize('view', $user);
 
-        $user->loadCount(['videos', 'subscriptions', 'likedVideos']);
+            $user->loadCount(['videos', 'subscriptions', 'likedVideos']);
 
-        return new UserResource($user);
+            return new UserResource($user);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
     }
 
 
     public function update(UpdateUserRequest $request, User $user): JsonResponse
     {
-        Gate::authorize('update', $user);
-        $data = $request->validated();
+        try {
+            Gate::authorize('update', $user);
+            $data = $request->validated();
 
-        if (isset($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
+            if (isset($data['password'])) {
+                $data['password'] = Hash::make($data['password']);
+            }
+
+            $user->update($data);
+
+            return (new UserResource($user))
+                ->response()
+                ->setStatusCode(200);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
         }
-
-        $user->update($data);
-
-        return (new UserResource($user))
-            ->response()
-            ->setStatusCode(200);
     }
 
-    public function destroy(User $user) {
+    public function destroy(User $user)
+    {
         Gate::authorize('delete', $user);
         try {
             $user->delete();

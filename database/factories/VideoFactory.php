@@ -13,7 +13,7 @@ class VideoFactory extends Factory
     public function definition(): array
     {
         return [
-            'user_id' => User::inRandomOrder()->first()?->id ?? 1,
+            'user_id' => User::inRandomOrder()->first()?->id ?? User::factory(),
             'title' => $this->faker->sentence(),
             'description' => $this->faker->paragraph(),
             'thumbnail_path' => $this->faker->imageUrl(640, 480, 'video'),

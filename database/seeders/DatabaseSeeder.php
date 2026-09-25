@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
             CategorySeeder::class,
             VideoCategorySeeder::class,
             CommentsSeeder::class,
+            VideoViewSeeder::class
         ]);
     }
 }

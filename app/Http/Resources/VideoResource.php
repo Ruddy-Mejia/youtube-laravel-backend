@@ -17,6 +17,7 @@ class VideoResource extends JsonResource
             'thumbnail_path' => $this->thumbnail_path,
             'author' => new UserResource($this->whenLoaded('user')),
             'categories' => CategoryResource::collection($this->whenLoaded('categories')),
+            'views' => $this->views,
             'likes_count' => $this->whenCounted('likes'),
             'comments_count' => $this->whenCounted('comments'),
             'comments' => CommentsResource::collection($this->whenLoaded('comments')),

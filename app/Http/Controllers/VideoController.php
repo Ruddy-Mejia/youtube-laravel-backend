@@ -6,9 +6,11 @@ use App\Models\Video;
 use App\Http\Requests\StoreVideoRequest;
 use App\Http\Requests\UpdateVideoRequest;
 use App\Http\Resources\VideoResource;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
 
 class VideoController extends Controller
 {
@@ -17,7 +19,12 @@ class VideoController extends Controller
         Gate::authorize('viewAny', Video::class);
 
         $videos = Video::withCount(['likedBy', 'comments'])
-            ->with(['categories'])
+            ->with([
+                'categories',
+                'user',
+                'comments.user',
+                'comments.replies.user',
+            ])
             ->latest()
             ->paginate(15);
 
@@ -25,22 +32,37 @@ class VideoController extends Controller
     }
 
 
-    public function store(StoreVideoRequest $request)
+    public function store(StoreVideoRequest $request): VideoResource
     {
         $data = $request->validated();
-        $data['duration'] = $data['duration'] ?? "00:00:00";
+
+        $data['thumbnail_path'] = $request->file('thumbnail')
+            ->store('thumbnails', 'public');
+
+        $data['duration'] = $data['duration'] ?? '00:00:00';
         $data['user_id'] = $request->user()->id;
+
+        unset($data['thumbnail']);
+
         $video = Video::create($data);
 
         return new VideoResource($video);
     }
 
-    public function show(Video $video)
+    public function show(Request $request, Video $video): VideoResource
     {
-        Gate::authorize('view', $video);
+        $user = $request->user('sanctum');
+        if ($user) {
+            $video->increment('views');
+            $video->refresh();
+
+            $user->watchedVideos()->syncWithoutDetaching([
+                $video->id => ['viewed_at' => now()],
+            ]);
+        }
 
         $video->loadCount(['likedBy', 'comments'])
-            ->load(['categories', 'user', 'comments.user']);
+            ->load(['categories', 'user', 'comments.user', 'comments.replies.user']);
 
         return new VideoResource($video);
     }
@@ -59,10 +81,10 @@ class VideoController extends Controller
     public function destroy(Video $video)
     {
         Gate::authorize('delete', $video);
-        
+
         try {
             $video->delete();
-            return response()->json(['message' => 'Video deleted successfully.'], 200);
+            return response()->noContent();
         } catch (\Exception $e) {
             return response()->json(['message' => 'Failed to delete video. ' . $e->getMessage()], 500);
         }
